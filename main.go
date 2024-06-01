@@ -3,23 +3,29 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 
 	"gin-learning/common"
+	"gin-learning/config"
 	"gin-learning/routes"
-	"gin-learning/services"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kelseyhightower/envconfig"
 )
 
 func setupRouter() *gin.Engine {
 	r := gin.Default()
-
 	return r
 }
 
 type Person struct {
 	Name string
 	Age  int
+}
+
+func stopForcefullyWithError(msg string, err error) {
+	fmt.Printf("%s: %v\n", msg, err.Error())
+	os.Exit(1)
 }
 
 func TestCustomMiddleware() gin.HandlerFunc {
@@ -29,6 +35,17 @@ func TestCustomMiddleware() gin.HandlerFunc {
 }
 
 func main() {
+	// validating configuration
+	var s config.Specification
+	err := envconfig.Process("ig", &s)
+	if err != nil {
+		stopForcefullyWithError("Error processing configuration ", err)
+	}
+	err = config.ValidateSpecification(s)
+	if err != nil {
+		stopForcefullyWithError("Invalid Configuration", err)
+	}
+	// setting up router
 	r := setupRouter()
 	// custom middleware
 	r.Use(TestCustomMiddleware())
@@ -43,10 +60,7 @@ func main() {
 		}
 		c.JSON(http.StatusOK, response)
 	})
-	r.GET("/users", func(c *gin.Context) {
-		data := services.GetUsers(c)
-		c.JSON(http.StatusOK, data)
-	})
+
 	routes.SetupRouters(r)
-	r.Run(":3201")
+	r.Run(":" + string(s.Port))
 }
